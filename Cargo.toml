@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+    "iguana-interpreter",
+    "iguana-ws",
+    "iguana",
+]
+
+[profile.release]
+opt-level = "s"

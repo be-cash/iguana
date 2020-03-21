@@ -1,0 +1,59 @@
+.code {
+    margin-bottom: 0;
+}
+
+.stack-trace-table .ant-table, .stack-item-popover, .byte-array, .byte-array-popover, .code-font {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 10px;
+}
+
+.stack-trace-table table {
+    height: 100%;
+}
+
+.stack-trace-table .ant-table.ant-table-small tr {
+    height: 100%;
+}
+
+.stack-trace-table .ant-table.ant-table-small td {
+    position: relative;
+    height: 100%;
+    padding: 0px;
+}
+
+.stack-trace-table .ant-table.ant-table-small td.column-info {
+    padding: 1px 8px;
+}
+
+.stack-item {
+    padding: 1px 8px;
+}
+
+.stack-item.not-executed {
+    opacity: 0.5;
+}
+
+.stack-item-background.delta-added {
+    box-shadow: inset 0 0 4px rgba(33, 134, 4, 0.6), 0 0 2px rgba(33, 134, 4, 0.6);
+}
+.stack-item-background.delta-changed {
+    box-shadow: inset 0 0 4px rgba(200, 134, 4, 0.6), 0 0 2px rgba(200, 134, 4, 0.6);
+}
+.stack-item-background.delta-moved {
+    box-shadow: inset 0 0 4px rgba(1, 134, 255, 0.6), 0 0 2px rgba(1, 134, 255, 0.6);
+}
+.stack-item-background.delta-movedindirectly {
+    box-shadow: inset 0 0 2px rgba(1, 134, 255, 0.6), 0 0 1px rgba(1, 134, 255, 0.6);
+}
+.stack-item-background.delta-observed {
+    box-shadow: inset 0 0 4px rgba(1, 5, 1, 0.1), 0 0 2px rgba(1, 5, 1, 0.1);
+}
+
+.stack-item-background {
+    position: absolute;
+    cursor: pointer;
+    height: 100%;
+    width: 100%;
+    top: 0px;
+    left: 0px;
+}

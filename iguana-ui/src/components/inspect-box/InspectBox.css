@@ -1,0 +1,7 @@
+.diff-added {
+    background-color: #2ecc40;
+}
+
+.diff-removed {
+    background-color: #ff4136;
+}
