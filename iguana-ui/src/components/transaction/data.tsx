@@ -47,10 +47,10 @@ function prepareStackItem(traceItem: TraceItem, stackItem: StackItem, limit: num
       break;
   }
   const name = stackItem.name();
-  const max = (limit || 16) - 1;
+  const max = Math.max(limit || 0, 16) - 1;
   return {
     name: name,
-    dataShort: formatted.length < max ? formatted : formatted.substr(0, max) + '…',
+    dataShort: formatted.length <= max ? formatted : formatted.substr(0, max) + '…',
     data: formatted,
     dataAlt: formattedAlt,
     delta: stackItem.delta().toLowerCase(),
