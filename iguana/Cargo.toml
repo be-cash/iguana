@@ -3,6 +3,11 @@ name = "iguana-lib"
 version = "0.1.0"
 authors = ["tobiasruck <ruck.tobias@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "A library for interacting with iguana with JavaScript"
+homepage = "https://github.com/be-cash/iguana"
+documentation = "https://github.com/be-cash/iguana"
+repository = "https://github.com/be-cash/iguana"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

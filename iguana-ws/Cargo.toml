@@ -3,8 +3,11 @@ name = "iguana-ws"
 version = "0.1.0"
 authors = ["tobiasruck <ruck.tobias@gmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
+description = "A library for serving iguana transactions via WebSocket (used in conjunction with iguana-ui)"
+homepage = "https://github.com/be-cash/iguana"
+documentation = "https://github.com/be-cash/iguana"
+repository = "https://github.com/be-cash/iguana"
 
 [dependencies]
 warp = "0.2"

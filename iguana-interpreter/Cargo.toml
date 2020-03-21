@@ -3,8 +3,11 @@ name = "iguana-interpreter"
 version = "0.1.0"
 authors = ["tobiasruck <ruck.tobias@gmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
+description = "An interpreter for Bitcoin Cash Script which keeps track of preimages and stack item names"
+homepage = "https://github.com/be-cash/iguana"
+documentation = "https://github.com/be-cash/iguana"
+repository = "https://github.com/be-cash/iguana"
 
 [dependencies]
 bitcoin-cash = {path="../../bitcoin-cash/bitcoin-cash", version="0.1.2"}
