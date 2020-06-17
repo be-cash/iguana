@@ -161,7 +161,7 @@ impl<E: ECC> ScriptInterpreter<E> {
             data = StackItemData::ByteArray(array.named_option(name.clone()));
         }
         let delta = match &op.op {
-            Op::Code(opcode) => opcode.behavior().delta[idx],
+            Op::Code(opcode) => *opcode.behavior().delta.get(idx).unwrap_or(&StackItemDelta::Removed),
             Op::PushBoolean(_) | Op::PushByteArray { .. } | Op::PushInteger(_) => {
                 StackItemDelta::Added
             }
@@ -470,7 +470,7 @@ impl<E: ECC> ScriptInterpreter<E> {
             OP_CODESEPARATOR => {}
             OP_CHECKLOCKTIMEVERIFY => {
                 let lock_time = self.pop_int()?;
-                if self.tx.lock_time() > lock_time as u32 {
+                if self.tx.lock_time() < lock_time as u32 {
                     return Err(VerifyFailed);
                 }
                 self.push_tagged_data(op, StackItemData::Integer(lock_time));

@@ -1,6 +1,6 @@
 [package]
 name = "iguana-interpreter"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["tobiasruck <ruck.tobias@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -10,4 +10,4 @@ documentation = "https://github.com/be-cash/iguana"
 repository = "https://github.com/be-cash/iguana"
 
 [dependencies]
-bitcoin-cash = {path="../../bitcoin-cash/bitcoin-cash", version="0.1.2"}
+bitcoin-cash = {path="../../bitcoin-cash/bitcoin-cash", version="0.1.3"}
