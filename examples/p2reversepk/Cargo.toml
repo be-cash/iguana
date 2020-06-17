@@ -1,0 +1,11 @@
+[package]
+name = "playground"
+version = "0.1.0"
+authors = ["tobiasruck <ruck.tobias@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+bitcoin-cash = "0.1"
+bitcoin-cash-ecc = "0.1"
+iguana-ws = "0.1"
+hex = "0.4"
