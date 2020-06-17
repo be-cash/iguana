@@ -2226,8 +2226,10 @@ iferr@^0.1.5:
   resolved "https://registry.yarnpkg.com/iferr/-/iferr-0.1.5.tgz#c60eed69e6d8fdb6b3104a1fcbca1c192dc5b501"
   integrity sha1-xg7taebY/bazEEofy8ocGS3FtQE=
 
-"iguana-lib@file:../iguana/pkg":
-  version "0.1.0"
+iguana-lib@0.1:
+  version "0.1.3"
+  resolved "https://registry.yarnpkg.com/iguana-lib/-/iguana-lib-0.1.3.tgz#0e210da7940ff19a580260d37faa4290608602cb"
+  integrity sha512-GbRXcKoORZEN69nn1hHcz0rmDfoJidzTzFATJjJzqH6iggv38oVlw4Z45UHgmvofd1ZsNaC27Wox+O1Uqa9NIA==
 
 immutable@^4.0.0-rc.12:
   version "4.0.0-rc.12"
