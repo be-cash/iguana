@@ -1,6 +1,6 @@
 [package]
 name = "iguana-lib"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["tobiasruck <ruck.tobias@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -17,9 +17,9 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-iguana-interpreter = {path="../iguana-interpreter", version="0.1.0"}
-bitcoin-cash = {path="../../bitcoin-cash/bitcoin-cash", version="0.1.2"}
-bitcoin-cash-ecc = { path = "../../bitcoin-cash/bitcoin-cash-ecc", features = ["rust_ecc"], default-features = false, version="0.1.2" }
+iguana-interpreter = {path="../iguana-interpreter", version="0.1.1"}
+bitcoin-cash = {path="../../bitcoin-cash/bitcoin-cash", version="0.1.3"}
+bitcoin-cash-ecc = { path = "../../bitcoin-cash/bitcoin-cash-ecc", features = ["rust_ecc"], default-features = false, version="0.1.4" }
 pretty-hex = "0.1"
 hex = "0.4"
 

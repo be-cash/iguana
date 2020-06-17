@@ -1,6 +1,6 @@
 [package]
 name = "iguana-ws"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["tobiasruck <ruck.tobias@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -13,6 +13,6 @@ repository = "https://github.com/be-cash/iguana"
 warp = "0.2"
 pretty_env_logger = "0.4"
 tokio = { version = "0.2" }
-bitcoin-cash = {path="../../bitcoin-cash/bitcoin-cash", version="0.1.2"}
+bitcoin-cash = {path="../../bitcoin-cash/bitcoin-cash", version="0.1.3"}
 futures = "0.3"
 lazy_static = "1.4"
