@@ -427,8 +427,11 @@ impl<E: ECC> ScriptInterpreter<E> {
                     OP_CHECKSIG | OP_CHECKSIGVERIFY => {
                         let sig = self.pop_byte_array()?;
                         let mut sig_ser = sig.to_vec();
-                        let sig_hash_flags =
-                            [SigHashFlags::from_u8(sig_ser.remove(sig_ser.len() - 1))];
+                        let sig_hash_flags = if sig_ser.len() > 0 {
+                            [SigHashFlags::from_u8(sig_ser.remove(sig_ser.len() - 1))]
+                        } else {
+                            [SigHashFlags::DEFAULT]
+                        };
                         let preimages =
                             self.tx.preimages(&sig_hash_flags)[self.input_idx][0].to_byte_array();
                         let sig = sig.apply_function(sig_ser, Function::ToDataSig);
@@ -451,7 +454,10 @@ impl<E: ECC> ScriptInterpreter<E> {
                     Err(err) => return Err(ScriptError::OpcodeMsg(opcode, err.to_string().into())),
                 };
                 if opcode == OP_CHECKSIG || opcode == OP_CHECKDATASIG {
-                    self.push_tagged_data(op, StackItemData::Boolean(true));
+                    if sig_ser.len() > 0 && !validity {
+                        return Err(InvalidSignature(msg, sig_ser));
+                    }
+                    self.push_tagged_data(op, StackItemData::Boolean(validity));
                 } else {
                     if !validity {
                         return Err(InvalidSignature(msg, sig_ser));
