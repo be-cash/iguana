@@ -1,12 +1,15 @@
+#[macro_use]
+extern crate thiserror;
+
 use std::borrow::Cow;
 use std::sync::Arc;
 
 use bitcoin_cash::{
-    encoding_utils::{encode_bool, encode_int, vec_to_int},
+    encoding_utils::{encode_bool, encode_int, vec_to_int, encode_minimally},
     Function, Hashed, Integer, Op, Opcode, Ops, Script, SigHashFlags, StackItemData,
-    StackItemDelta, TaggedOp, Tx,
+    StackItemDelta, TaggedOp, Tx, IntegerError, BitcoinCode, error::Error,
+    ByteArray, Hash160, Ripemd160, Sha1, Sha256, Sha256d, ECC,
 };
-use bitcoin_cash::{error, ByteArray, Hash160, Ripemd160, Sha1, Sha256, Sha256d, ECC};
 use std::convert::TryInto;
 
 pub struct ScriptInterpreter<E: ECC> {
@@ -18,26 +21,58 @@ pub struct ScriptInterpreter<E: ECC> {
     exec_stack: Vec<bool>,
     ecc: Arc<E>,
     input_idx: usize,
+    is_p2sh: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Error, Clone, Debug)]
 pub enum ScriptError {
+    #[error("Invalid public key: {0}")]
     InvalidPubKey(ByteArray),
+
+    #[error("Invalid signature format: {0}")]
     InvalidSignatureFormat(ByteArray),
+
+    #[error("Invalid signature: {0}, {1}")]
     InvalidSignature(ByteArray, ByteArray),
+
+    #[error("OP_EQUALVERIFY failed: {0} ≠ {1}")]
     EqualVerifyFailed(ByteArray, ByteArray),
+
+    #[error("OP_VERIFY failed")]
     VerifyFailed,
+
+    #[error("Opcode not implemented")]
     NotImplemented,
+
+    #[error("Opcode not implemented")]
     ScriptFinished,
+
+    #[error("Invalid data type")]
     InvalidDataType,
+
+    #[error("Stack empty")]
     StackEmpty,
+
+    #[error("{0}: {1}")]
     OpcodeMsg(Opcode, Cow<'static, str>),
+
+    #[error("{0}: Unbalanced conditionals")]
     UnbalancedConditionals(Opcode),
+
+    #[error("Invalid opcode: {0}")]
     InvalidOpcode(u8),
+
+    #[error("Invalid depth: {0}")]
     InvalidDepth(Integer),
+
+    #[error("Invalid depth: {0}")]
+    InvalidInteger(#[from] IntegerError),
+
+    #[error("Invalid inversion")]
+    InvalidConversion(#[from] std::num::TryFromIntError),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StackItem {
     pub data: StackItemData,
     pub name: Option<Arc<Cow<'static, str>>>,
@@ -46,7 +81,7 @@ pub struct StackItem {
 impl StackItem {
     pub fn to_bool(&self) -> bool {
         match self.data {
-            StackItemData::Integer(int) => int != 0,
+            StackItemData::Integer(int) => int != Integer::ZERO,
             StackItemData::Boolean(boolean) => boolean,
             StackItemData::ByteArray(ref array) => array.len() > 0,
         }
@@ -55,14 +90,16 @@ impl StackItem {
 
 impl<E: ECC> ScriptInterpreter<E> {
     pub fn new(tx: Arc<Tx>, input_idx: usize, ecc: Arc<E>) -> Self {
+        let input = &tx.inputs()[input_idx];
         ScriptInterpreter {
             stack: Vec::new(),
             alt_stack: Vec::new(),
             instruction_pointer: 0,
-            lock_script: tx.inputs()[input_idx]
+            lock_script: input
                 .lock_script
                 .clone()
                 .expect("Input must have lock_script"),
+            is_p2sh: input.is_p2sh.expect("Input must have is_p2sh"),
             tx,
             input_idx,
             exec_stack: Vec::new(),
@@ -80,23 +117,30 @@ impl<E: ECC> ScriptInterpreter<E> {
     fn pop_bool(&mut self) -> Result<bool, ScriptError> {
         match self.pop()?.data {
             StackItemData::ByteArray(_) => Err(ScriptError::InvalidDataType),
-            StackItemData::Integer(int) => Ok(int != 0),
+            StackItemData::Integer(int) => Ok(int != Integer::ZERO),
             StackItemData::Boolean(boolean) => Ok(boolean),
         }
     }
 
     fn pop_int(&mut self) -> Result<Integer, ScriptError> {
         match self.pop()?.data {
-            StackItemData::ByteArray(_) => Err(ScriptError::InvalidDataType),
+            StackItemData::ByteArray(byte_array) => {
+                let mut minimally_encoded = byte_array.to_vec();
+                encode_minimally(&mut minimally_encoded);
+                if byte_array.as_ref() != minimally_encoded.as_slice() {
+                    return Err(ScriptError::InvalidDataType);
+                }
+                vec_to_int(&minimally_encoded).and_then(|int| Ok(Integer::new(int)?)).map_err(|_| ScriptError::InvalidDataType)
+            },
             StackItemData::Integer(int) => Ok(int),
-            StackItemData::Boolean(boolean) => Ok(if boolean { 1 } else { 0 }),
+            StackItemData::Boolean(boolean) => Ok(Integer::new(if boolean { 1 } else { 0 }).unwrap()),
         }
     }
 
     fn pop_byte_array(&mut self) -> Result<ByteArray, ScriptError> {
         match self.pop()?.data {
             StackItemData::ByteArray(byte_array) => Ok(byte_array),
-            StackItemData::Integer(int) => Ok(encode_int(int).into()),
+            StackItemData::Integer(int) => Ok(encode_int(int.value()).into()),
             StackItemData::Boolean(boolean) => Ok(encode_bool(boolean).into()),
         }
     }
@@ -110,7 +154,7 @@ impl<E: ECC> ScriptInterpreter<E> {
 
     pub fn push_input_data(&mut self) -> Result<(), ScriptError> {
         let input_script = Arc::clone(self.tx.inputs()[self.input_idx].script.ops_arc());
-        for op in &input_script[..input_script.len() - 1] {
+        for op in &input_script[..input_script.len() - if self.is_p2sh {1} else {0}] {
             self.run_op(op)?;
         }
         Ok(())
@@ -203,11 +247,11 @@ impl<E: ECC> ScriptInterpreter<E> {
 
     fn pop_depth_to_idx(&mut self) -> Result<usize, ScriptError> {
         let depth = self.pop_int()?;
-        let depth = depth.try_into().map_err(|_| ScriptError::InvalidDepth(depth))?;
+        let depth_usize = depth.value().try_into().map_err(|_| ScriptError::InvalidDepth(depth))?;
         self.stack.len()
-            .checked_sub(depth)
+            .checked_sub(depth_usize)
             .and_then(|x| x.checked_sub(1))
-            .ok_or(ScriptError::InvalidDepth(depth as Integer))
+            .ok_or(ScriptError::InvalidDepth(depth))
     }
 
     fn run_opcode(
@@ -249,11 +293,11 @@ impl<E: ECC> ScriptInterpreter<E> {
                 self.push_tagged_data(op, StackItemData::ByteArray(second.concat(first)));
             }
             OP_SPLIT => {
-                let split_idx = self.pop_int()? as usize;
+                let split_idx = self.pop_int()?.value().try_into()?;
                 let top = self.pop_byte_array()?;
                 let (left, right) = top
                     .split(split_idx)
-                    .map_err(|err| ScriptError::OpcodeMsg(OP_SPLIT, err.into()))?;
+                    .map_err(|err| ScriptError::OpcodeMsg(OP_SPLIT, err.to_string().into()))?;
                 self.push_tagged_data_idx(op, StackItemData::ByteArray(left), 0);
                 self.push_tagged_data_idx(op, StackItemData::ByteArray(right), 1);
             }
@@ -264,18 +308,22 @@ impl<E: ECC> ScriptInterpreter<E> {
                     op,
                     StackItemData::ByteArray(
                         ByteArray::from_int(int, n_bytes)
-                            .map_err(|err| ScriptError::OpcodeMsg(OP_NUM2BIN, err.into()))?,
+                            .map_err(|err| ScriptError::OpcodeMsg(OP_NUM2BIN, err.to_string().into()))?,
                     ),
                 );
             }
             OP_BIN2NUM => {
                 let array = self.pop_byte_array()?;
-                self.push_tagged_data(op, StackItemData::Integer(vec_to_int(&array)));
+                self.push_tagged_data(op, StackItemData::Integer(
+                    vec_to_int(&array)
+                        .and_then(|int| Ok(Integer::new(int)?))
+                        .map_err(|err|  ScriptError::OpcodeMsg(OP_BIN2NUM, err.to_string().into()))?.into()
+                ));
             }
             OP_SIZE => {
                 let array = &self.stack[self.stack.len() - 1].data;
                 if let StackItemData::ByteArray(array) = array {
-                    let len = array.len() as Integer;
+                    let len = Integer::new(array.len())?;
                     self.push_tagged_data(op, StackItemData::Integer(len));
                 } else {
                     return Err(ScriptError::InvalidDataType);
@@ -328,12 +376,46 @@ impl<E: ECC> ScriptInterpreter<E> {
                     self.push_tagged_data(op, StackItemData::Boolean(equal));
                 }
             }
+            OP_NUMEQUAL => {
+                let first = self.pop_int()?;
+                let second = self.pop_int()?;
+                self.push_tagged_data(op, StackItemData::Boolean(first == second));
+            }
             OP_NUMEQUALVERIFY => {
                 let first = self.pop_int()?;
                 let second = self.pop_int()?;
                 if first != second {
                     return Err(VerifyFailed);
                 }
+            }
+            OP_BOOLAND => {
+                let first = self.pop_bool()?;
+                let second = self.pop_bool()?;
+                self.push_tagged_data(op, StackItemData::Boolean(first && second));
+            }
+            OP_BOOLOR => {
+                let first = self.pop_bool()?;
+                let second = self.pop_bool()?;
+                self.push_tagged_data(op, StackItemData::Boolean(first || second));
+            }
+            OP_AND | OP_OR | OP_XOR => {
+                let first = self.pop_byte_array()?;
+                let second = self.pop_byte_array()?;
+                if first.len() != second.len() {
+                    return Err(ScriptError::OpcodeMsg(
+                        OP_AND,
+                        format!("Byte arrays have unequal length: {} != {}", first.len(), second.len()).into(),
+                    ));
+                }
+                let result = first.iter().zip(second.iter()).map(|(&a, &b)| {
+                    match opcode {
+                        OP_AND => a & b,
+                        OP_OR => a | b,
+                        OP_XOR => a ^ b,
+                        _ => unreachable!(),
+                    }
+                }).collect::<Vec<_>>();
+                self.push_tagged_data(op, StackItemData::ByteArray(result.into()));
             }
             OP_NOT => {
                 let boolean = self.pop_bool()?;
@@ -360,44 +442,62 @@ impl<E: ECC> ScriptInterpreter<E> {
                 self.push_tagged_data(op, StackItemData::Boolean(second < first));
             }
             OP_MIN => {
-                let first = self.pop_int()?;
-                let second = self.pop_int()?;
-                self.push_tagged_data(op, StackItemData::Integer(second.min(first)));
+                let first = self.pop_int()?.value();
+                let second = self.pop_int()?.value();
+                let result = Integer::new(second.min(first))?;
+                self.push_tagged_data(op, StackItemData::Integer(result));
             }
             OP_MAX => {
-                let first = self.pop_int()?;
-                let second = self.pop_int()?;
-                self.push_tagged_data(op, StackItemData::Integer(second.max(first)));
+                let first = self.pop_int()?.value();
+                let second = self.pop_int()?.value();
+                let result = Integer::new(second.max(first))?;
+                self.push_tagged_data(op, StackItemData::Integer(result));
+            }
+            OP_WITHIN => {
+                let max = self.pop_int()?;
+                let min = self.pop_int()?;
+                let value = self.pop_int()?;
+                self.push_tagged_data(op, StackItemData::Boolean(value >= min && value < max));
             }
             OP_0NOTEQUAL => {
                 let top = self.pop_int()?;
-                self.push_tagged_data(op, StackItemData::Boolean(top != 0));
+                self.push_tagged_data(op, StackItemData::Boolean(top != Integer::ZERO));
+            }
+            OP_1ADD => {
+                let a = self.pop_int()?;
+                self.push_tagged_data(op, StackItemData::Integer((a + 1).integer()?));
+            }
+            OP_1SUB => {
+                let a = self.pop_int()?;
+                self.push_tagged_data(op, StackItemData::Integer((a - 1).integer()?));
+            }
+            OP_NEGATE => {
+                let a = self.pop_int()?;
+                self.push_tagged_data(op, StackItemData::Integer(-a));
+            }
+            OP_ABS => {
+                let a = self.pop_int()?;
+                self.push_tagged_data(op, StackItemData::Integer(Integer::new(a.abs())?));
             }
             OP_ADD => {
                 let b = self.pop_int()?;
                 let a = self.pop_int()?;
-                self.push_tagged_data(op, StackItemData::Integer(a + b));
+                self.push_tagged_data(op, StackItemData::Integer((a + b).integer()?));
             }
             OP_SUB => {
                 let b = self.pop_int()?;
                 let a = self.pop_int()?;
-                self.push_tagged_data(op, StackItemData::Integer(a - b));
+                self.push_tagged_data(op, StackItemData::Integer((a - b).integer()?));
             }
             OP_DIV => {
                 let b = self.pop_int()?;
                 let a = self.pop_int()?;
-                if b == 0 {
-                    return Err(ScriptError::OpcodeMsg(opcode, "Division by 0".into()));
-                }
-                self.push_tagged_data(op, StackItemData::Integer(a / b));
+                self.push_tagged_data(op, StackItemData::Integer((a / b).integer()?));
             }
             OP_MOD => {
                 let b = self.pop_int()?;
                 let a = self.pop_int()?;
-                if b == 0 {
-                    return Err(ScriptError::OpcodeMsg(opcode, "Modulo by 0".into()));
-                }
-                self.push_tagged_data(op, StackItemData::Integer(a % b));
+                self.push_tagged_data(op, StackItemData::Integer((a % b).integer()?));
             }
             OP_IF => {
                 let top = if is_executed { self.pop_bool()? } else { false };
@@ -433,7 +533,7 @@ impl<E: ECC> ScriptInterpreter<E> {
                             [SigHashFlags::DEFAULT]
                         };
                         let preimages =
-                            self.tx.preimages(&sig_hash_flags)[self.input_idx][0].to_byte_array();
+                            self.tx.preimages(&sig_hash_flags)[self.input_idx][0].ser();
                         let sig = sig.apply_function(sig_ser, Function::ToDataSig);
                         (Sha256d::digest(preimages).into_byte_array(), sig)
                     }
@@ -445,10 +545,10 @@ impl<E: ECC> ScriptInterpreter<E> {
                 };
                 let validity = match self.ecc.verify(&pubkey, &msg, &sig_ser) {
                     Ok(validity) => validity,
-                    Err(error::Error(error::ErrorKind::InvalidPubkey, _)) => {
+                    Err(Error::InvalidPubkey) => {
                         return Err(ScriptError::InvalidPubKey(pubkey))
                     }
-                    Err(error::Error(error::ErrorKind::InvalidSignatureFormat, _)) => {
+                    Err(Error::InvalidSignatureFormat) => {
                         return Err(ScriptError::InvalidSignatureFormat(sig_ser))
                     }
                     Err(err) => return Err(ScriptError::OpcodeMsg(opcode, err.to_string().into())),
@@ -476,10 +576,13 @@ impl<E: ECC> ScriptInterpreter<E> {
             OP_CODESEPARATOR => {}
             OP_CHECKLOCKTIMEVERIFY => {
                 let lock_time = self.pop_int()?;
-                if self.tx.lock_time() < lock_time as u32 {
+                if self.tx.lock_time() < lock_time.value().try_into()? {
                     return Err(VerifyFailed);
                 }
                 self.push_tagged_data(op, StackItemData::Integer(lock_time));
+            }
+            OP_CHECKSEQUENCEVERIFY => {
+                // TODO
             }
             _ => {
                 let behavior = opcode.behavior();
