@@ -13,6 +13,6 @@ repository = "https://github.com/be-cash/iguana"
 warp = "0.2"
 pretty_env_logger = "0.4"
 tokio = { version = "0.2" }
-bitcoin-cash = {path="../../bitcoin-cash/bitcoin-cash", version="0.2.0"}
+bitcoin-cash = {path="../../bitcoin-cash/bitcoin-cash", version="1.0.0-beta.0"}
 futures = "0.3"
 lazy_static = "1.4"
