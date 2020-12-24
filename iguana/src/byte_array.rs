@@ -1,27 +1,26 @@
-use bitcoin_cash::ByteArray as _ByteArray;
 use wasm_bindgen::prelude::*;
 use std::sync::Arc;
 
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct ByteArray {
-    byte_arrays: Arc<[_ByteArray]>,
+    byte_arrays: Arc<[bitcoin_cash::ByteArray]>,
     idx: usize,
 }
 
 impl ByteArray {
-    pub fn new(byte_arrays: Arc<[_ByteArray]>, idx: usize) -> Self {
+    pub fn new(byte_arrays: Arc<[bitcoin_cash::ByteArray]>, idx: usize) -> Self {
         ByteArray { byte_arrays, idx }
     }
 
-    pub fn from_byte_array(byte_array: _ByteArray) -> Self {
+    pub fn from_byte_array(byte_array: bitcoin_cash::ByteArray) -> Self {
         ByteArray {
             byte_arrays: Arc::new([byte_array]),
             idx: 0,
         }
     }
 
-    fn byte_array(&self) -> &_ByteArray {
+    fn byte_array(&self) -> &bitcoin_cash::ByteArray {
         &self.byte_arrays[self.idx]
     }
 }

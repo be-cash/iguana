@@ -131,7 +131,7 @@ impl StackItem {
 impl StackItem {
     pub fn data(&self) -> JsValue {
         match self.item().data {
-            StackItemData::Integer(int) => int.into(),
+            StackItemData::Integer(int) => int.value().into(),
             StackItemData::Boolean(boolean) => boolean.into(),
             StackItemData::ByteArray(ref array) => ByteArray::from_byte_array(array.clone()).into(),
         }
@@ -164,6 +164,8 @@ impl ScriptError {
             UnbalancedConditionals(..) => "Unbalanced conditionals".to_string(),
             InvalidOpcode(code) => format!("Invalid opcode: {:02x}", code),
             InvalidDepth(depth) => format!("Invalid depth: {}", depth),
+            InvalidInteger(integer) => format!("Invalid integer: {}", integer),
+            InvalidConversion(conversion) => format!("Invalid conversion: {}", conversion),
         }
     }
 

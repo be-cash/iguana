@@ -59,7 +59,7 @@ impl Op {
             Invalid(code) => format!("INVALID_{}", code).into(),
             PushByteArray { ref array, .. } => ByteArray::from_byte_array(array.clone()).into(),
             PushBoolean(boolean) => boolean.into(),
-            PushInteger(int) => int.into(),
+            PushInteger(int) => int.value().into(),
         }
     }
 
